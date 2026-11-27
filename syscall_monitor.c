@@ -48,8 +48,8 @@ static void ring_push(const char *syscall, const char *path)
     ring[idx].ts  = ktime_get_real();
     ring[idx].pid = task_pid_nr(current);
     ring[idx].uid = from_kuid(&init_user_ns, current_uid());
-    strncpy(ring[idx].syscall, syscall, sizeof(ring[idx].syscall) - 1);
-    strncpy(ring[idx].path,    path,    sizeof(ring[idx].path)    - 1);
+    strscpy(ring[idx].syscall, syscall, sizeof(ring[idx].syscall) - 1);
+    strscpy(ring[idx].path,    path,    sizeof(ring[idx].path)    - 1);
 
     ring_head++;
     if (ring_count < LOG_ENTRIES) ring_count++;
@@ -77,8 +77,8 @@ static int handler_pre_openat(struct kprobe *p, struct pt_regs *regs)
     struct pt_regs *inner = (struct pt_regs *)regs->di;
     const char __user *upath = (const char __user *)inner->si;
     char path[PATH_LEN] = "<unknown>";
-    if (upath)
-        strncpy_from_user(path, upath, sizeof(path) - 1);
+    if (upath && strncpy_from_user(path, upath, sizeof(path) - 1) < 0)
+	    strscpy(path, "<unknown>", sizeof(path));
 
     ring_push("openat", path);
     return 0;
@@ -93,8 +93,8 @@ static int handler_pre_execve(struct kprobe *p, struct pt_regs *regs)
     struct pt_regs *inner = (struct pt_regs *)regs->di;
     const char __user *upath = (const char __user *)inner->di;
     char path[PATH_LEN] = "<unknown>";
-    if (upath)
-        strncpy_from_user(path, upath, sizeof(path) - 1);
+    if (upath && strncpy_from_user(path, upath, sizeof(path) - 1) < 0)
+	    strscpy(path, "<unknown>", sizeof(path));
 
     ring_push("execve", path);
     return 0;
